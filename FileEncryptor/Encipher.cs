@@ -61,6 +61,35 @@ namespace Encryptor
         }
 
         /// <summary>
+        /// Encrypt a file
+        /// </summary>
+        /// <param name="plainFilePath">Full path of the file to be encrypted</param>
+        /// <param name="encryptedFilePath">Full path of the encrypted file</param>
+        /// <param name="manifestFilePath">Full path of the generated manifest file</param>
+        /// <param name="product">Product name</param>
+        /// <param name="productVersion">Product version</param>
+        /// <param name="rsaKey">RSA key used to encrypt the one-time symmetrical key</param>
+        /// <param name="rsaKeyId">RSA key id for backend index</param>
+        /// <returns>Encryption information including symmetrical keys for data encryption and signature, just for debug purpose</returns>
+        public static string DESEncrypt(string plainFilePath,
+            string encryptedFilePath,
+            string manifestFilePath,
+            string rsaKey)
+        {
+            byte[] signatureKey = GenerateRandom(64);
+            byte[] encryptionKey = GenerateRandom(16);
+            byte[] encryptionIV = GenerateRandom(16);
+
+            DESEncryptFile(plainFilePath, encryptedFilePath, encryptionKey, encryptionIV);
+
+            byte[] signature = CalculateSignature(encryptedFilePath, signatureKey);
+
+            CreateManifest(signature, signatureKey, encryptionKey, encryptionIV, rsaKey, manifestFilePath);
+
+            return CreateEncryptionInfoXml(signatureKey, encryptionKey, encryptionIV);
+        }
+
+        /// <summary>
         /// Create encryption information in the form of xml string
         /// </summary>
         /// <param name="signatureKey">Signature Key</param>
@@ -132,7 +161,38 @@ namespace Encryptor
         }
 
         /// <summary>
-        /// Encrypt a file with AES
+        /// Encrypt a file with DES
+        /// </summary>
+        /// <param name="plainFilePath">Full path of the file to be encrypted</param>
+        /// <param name="encryptedFilePath">Full path of the encrypted file</param>
+        /// <param name="key">AES key</param>
+        /// <param name="iv">AES IV</param>
+        private static void DESEncryptFile(string plainFilePath,
+            string encryptedFilePath,
+            byte[] key,
+            byte[] iv)
+        {
+            using (DESCryptoServiceProvider des = new DESCryptoServiceProvider())
+            {
+                des.KeySize = 128;
+                des.Key = key;
+                des.IV = iv;
+                ICryptoTransform encryptor = des.CreateEncryptor(des.Key, des.IV);
+                using (FileStream plain = File.Open(plainFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    using (FileStream encrypted = File.Open(encryptedFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        using (CryptoStream cs = new CryptoStream(encrypted, encryptor, CryptoStreamMode.Write))
+                        {
+                            plain.CopyTo(cs);
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Decrypt a file with AES
         /// </summary>
         /// <param name="plainFilePath">Full path of the encrypted file</param>
         /// <param name="encryptedFilePath">Full path of the file to be decrypted</param>
@@ -158,7 +218,35 @@ namespace Encryptor
                 }
             }
         }
-        
+
+        /// <summary>
+        /// Decrypt a file with DES
+        /// </summary>
+        /// <param name="plainFilePath">Full path of the encrypted file</param>
+        /// <param name="encryptedFilePath">Full path of the file to be decrypted</param>
+        /// <param name="key">AES key</param>
+        /// <param name="iv">AES IV</param>
+        public static void DESDecryptFile(string plainFilePath, string encryptedFilePath, byte[] key, byte[] iv)
+        {
+            using (DESCryptoServiceProvider des = new DESCryptoServiceProvider())
+            {
+                des.KeySize = 128;
+                des.Key = key;
+                des.IV = iv;
+                ICryptoTransform decryptor = des.CreateDecryptor(des.Key, des.IV);
+                using (FileStream plain = File.Open(plainFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    using (FileStream encrypted = File.Open(encryptedFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    {
+                        using (CryptoStream cs = new CryptoStream(plain, decryptor, CryptoStreamMode.Write))
+                        {
+                            encrypted.CopyTo(cs);
+                        }
+                    }
+                }
+            }
+        }
+
 
         /// <summary>
         /// Encrypt byte array with RSA
