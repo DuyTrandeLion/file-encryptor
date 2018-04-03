@@ -19,6 +19,7 @@
             <MenuItem Header="Tool">
                 <MenuItem x:Name="mi_genKeyPair" Header="Generate Key Pair" Click="mi_genKeyPair_Click"/>
                 <MenuItem x:Name="mi_convertKey" Header="Convert pem key to xml" Click="mi_convertKey_Click"/>
+				<MenuItem x:Name="mi_hashFunc" Header="Hash function" Click="mi_hashFunc_Click"/>
             </MenuItem>
         </Menu>
         <Grid x:Name="grid_decrypt" Margin="10,27,10,10" Visibility="Collapsed">

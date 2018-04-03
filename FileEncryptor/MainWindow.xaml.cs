@@ -267,6 +267,16 @@ namespace FileEncryptor
             }
         }
 
+        private void mi_hashFunc_Click(object sender, RoutedEventArgs e)
+        {
+            HashWindow hw = new HashWindow();
+            Nullable<bool> result = hw.ShowDialog();
+            if (result == true)
+            {
+
+            }
+        }
+
         private void tb_outputDecrypt_TextChanged(object sender, TextChangedEventArgs e)
         {
             this.tb_outputDecrypt.ScrollToEnd();

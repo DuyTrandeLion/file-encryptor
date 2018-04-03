@@ -4,17 +4,17 @@
 winexe
 C#
 .cs
-D:\Cryptography & Network Security\FileEncryptor\FileEncryptor\obj\Debug\
+C:\Users\DELL\Desktop\file-encryptor\FileEncryptor\obj\Debug\
 FileEncryptor
 none
 false
 DEBUG;TRACE
-D:\Cryptography & Network Security\FileEncryptor\FileEncryptor\App.xaml
-353359875
+C:\Users\DELL\Desktop\file-encryptor\FileEncryptor\App.xaml
+4-337526530
 
-13-493787094
+14367650447
 13-1868018694
-DecryptionSettingWindow.xaml;MainWindow.xaml;SettingWindow.xaml;
+DecryptionSettingWindow.xaml;MainWindow.xaml;HashWindow.xaml;SettingWindow.xaml;
 
 False
 
