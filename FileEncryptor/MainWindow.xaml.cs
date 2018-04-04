@@ -34,6 +34,8 @@ namespace FileEncryptor
             this.freeEvent = new EventWaitHandle(true, EventResetMode.ManualReset);
         }
 
+        private int mode = 1;
+
         private void bt_selPlain_Click(object sender, RoutedEventArgs e)
         {
             OpenFileDialog ofd = new OpenFileDialog();
@@ -61,7 +63,7 @@ namespace FileEncryptor
                 return;
             }
 
-            if (string.IsNullOrEmpty(publicKey))
+            if (string.IsNullOrEmpty(publicKey) && string.IsNullOrEmpty(key))
             {
                 MessageBox.Show(this,Properties.Resources.Error_Need_PublicKey);
                 return;
@@ -76,10 +78,20 @@ namespace FileEncryptor
             var t = Task.Factory.StartNew(() =>
             {
                 freeEvent.Reset();
-                string s = Encryptor.Encipher.Encrypt(plainFilePath,
-                    encryptedFilePath,
-                    manifestFilePath,
-                    this.publicKey);
+                string s = null;
+                if (mode == 0)
+                {
+                    s = Encryptor.Encipher.DESEncryptFile(plainFilePath,
+                                                        encryptedFilePath,
+                                                        this.key);
+                }
+                else if (mode == 1)
+                {
+                    s = Encryptor.Encipher.Encrypt(plainFilePath,
+                                                        encryptedFilePath,
+                                                        manifestFilePath,
+                                                        this.publicKey);
+                }
 
                 freeEvent.Set();
                 this.UpdateOutput(this.tb_output, Properties.Resources.Out_msg_encrypt_success + "\r\n" + s,true);
@@ -96,19 +108,35 @@ namespace FileEncryptor
         }
 
         private string publicKey;
-
         private string privateKey;
+
+        private string key;
         private string manifestFilePath;
 
         private void bt_setting_Click(object sender, RoutedEventArgs e)
         {
             SettingWindow sw = new SettingWindow();
-            sw.PublicKey = this.publicKey;
-            Nullable<bool> result = sw.ShowDialog();
-
-            if (result == true)
+            if (mode == 1)
             {
-                this.publicKey = sw.PublicKey;
+                sw.PublicKey = this.publicKey;
+                Nullable<bool> result = sw.ShowDialog();
+
+                if (result == true)
+                {
+                    this.publicKey = sw.PublicKey;
+                }
+            }
+            else if (mode == 0)
+            {
+                sw.Key = this.key;
+                sw.bt_importPublicKey.Content = "Input";
+                sw.key_name.Content = "RSA Key";
+                Nullable<bool> result = sw.ShowDialog();
+
+                if (result == true)
+                {
+                    this.key = sw.Key;
+                }
             }
         }
 
@@ -128,8 +156,7 @@ namespace FileEncryptor
                 string privateKeyPath = System.IO.Path.Combine(fbd.SelectedPath, "privateKey.xml");
 
                 string publicKey;
-                string privateKey;
-                Encryptor.Encipher.GenerateRSAKeyPair(out publicKey, out privateKey);
+                Encryptor.Encipher.GenerateRSAKeyPair(out publicKey, out string privateKey);
                 using (StreamWriter sw = File.CreateText(publicKeyPath))
                 {
                     sw.Write(publicKey);
@@ -138,6 +165,21 @@ namespace FileEncryptor
                 using (StreamWriter sw = File.CreateText(privateKeyPath))
                 {
                     sw.Write(privateKey);
+                }
+            }
+        }
+
+        private void mi_genDesKey_Click(object sender, RoutedEventArgs e)
+        {
+            System.Windows.Forms.FolderBrowserDialog fbd = new System.Windows.Forms.FolderBrowserDialog();
+            fbd.Description = FileEncryptor.Properties.Resources.DialogTitle_CreateKey;
+            if (fbd.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                string keyPath = System.IO.Path.Combine(fbd.SelectedPath, "key.xml");
+                Encryptor.Encipher.GenerateDESKey(out string key);
+                using (StreamWriter sw = File.CreateText(keyPath))
+                {
+                    sw.Write(key);
                 }
             }
         }
@@ -188,18 +230,25 @@ namespace FileEncryptor
             string rsaKey = this.privateKey;
             string encryptedFile = this.tb_encryptedFilePath.Text;
             string plainFile = MakePath(encryptedFile, ".decrypted");
-            string manifestFile = this.manifestFilePath;
-            XDocument doc = XDocument.Load(manifestFile);
-            XElement aesKeyElement = doc.Root.XPathSelectElement("./DataEncryption/AESEncryptedKeyValue/Key");
-            byte[] aesKey = Encryptor.Encipher.RSADescryptBytes(Convert.FromBase64String(aesKeyElement.Value), rsaKey);
-            XElement aesIvElement = doc.Root.XPathSelectElement("./DataEncryption/AESEncryptedKeyValue/IV");
-            byte[] aesIv = Encryptor.Encipher.RSADescryptBytes(Convert.FromBase64String(aesIvElement.Value), rsaKey);
-
+            
             this.tb_outputDecrypt.Text = Properties.Resources.Out_msg_start_decryption;
             var t = Task.Factory.StartNew(() =>
             {
                 freeEvent.Reset();
-                Encryptor.Encipher.DecryptFile(plainFile, encryptedFile, aesKey, aesIv);
+                if (mode == 0)
+                {
+                    Encryptor.Encipher.DESDecryptFile(encryptedFile, plainFile, this.key);
+                }
+                else if (mode == 1)
+                {
+                    string manifestFile = this.manifestFilePath;
+                    XDocument doc = XDocument.Load(manifestFile);
+                    XElement aesKeyElement = doc.Root.XPathSelectElement("./DataEncryption/AESEncryptedKeyValue/Key");
+                    byte[] aesKey = Encryptor.Encipher.RSADescryptBytes(Convert.FromBase64String(aesKeyElement.Value), rsaKey);
+                    XElement aesIvElement = doc.Root.XPathSelectElement("./DataEncryption/AESEncryptedKeyValue/IV");
+                    byte[] aesIv = Encryptor.Encipher.RSADescryptBytes(Convert.FromBase64String(aesIvElement.Value), rsaKey);
+                    Encryptor.Encipher.DecryptFile(plainFile, encryptedFile, aesKey, aesIv);
+                }
                 freeEvent.Set();
                 this.UpdateOutput(this.tb_outputDecrypt, string.Format(Properties.Resources.Out_msg_decryption_success, plainFile), true);
             });
@@ -210,11 +259,20 @@ namespace FileEncryptor
             DecryptionSettingWindow dsw = new DecryptionSettingWindow();
             dsw.Key = this.privateKey;
             dsw.ManifestFilePath = this.manifestFilePath;
+            if (mode == 0)
+            {
+                dsw.tb_manifestPath.Visibility = System.Windows.Visibility.Hidden;
+                dsw.bt_selManifest.Visibility = System.Windows.Visibility.Hidden;
+                dsw.head_maniPath.Visibility = System.Windows.Visibility.Hidden;
+                dsw.Title = "Input RSA Key";
+            }
+            
             Nullable<bool> result = dsw.ShowDialog();
             if (result == true)
             {
                 this.privateKey = dsw.Key;
                 this.manifestFilePath = dsw.ManifestFilePath;
+                this.key = dsw.DesKey;
             }
         }
 
@@ -280,6 +338,25 @@ namespace FileEncryptor
         private void tb_outputDecrypt_TextChanged(object sender, TextChangedEventArgs e)
         {
             this.tb_outputDecrypt.ScrollToEnd();
+        }
+
+        private void mi_selRSAAES_Click(object sender, RoutedEventArgs e)
+        {
+            mi_selRSAAES.IsChecked = true;
+            mi_selDES.IsChecked = false;
+            mode = 1;
+        }
+
+        private void mi_selDES_Click(object sender, RoutedEventArgs e)
+        {
+            mi_selRSAAES.IsChecked = false;
+            mi_selDES.IsChecked = true;
+            mode = 0;
+        }
+
+        private void mh_althorism(Object sender, EventArgs e)
+        {
+            // dummy
         }
     }
 }

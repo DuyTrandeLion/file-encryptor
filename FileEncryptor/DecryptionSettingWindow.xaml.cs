@@ -39,7 +39,24 @@ namespace FileEncryptor
         #endregion
 
         private string key;
+        private string desKey;
         private string manifestFilePath;
+
+        public string DesKey
+        {
+            get
+            {
+                return this.desKey;
+            }
+            set
+            {
+                if (value != this.desKey)
+                {
+                    this.desKey = value;
+                    Notify("desKey");
+                }
+            }
+        }
 
         public string Key
         {
@@ -104,6 +121,7 @@ namespace FileEncryptor
                 using (StreamReader sr = File.OpenText(ofd.FileName))
                 {
                     this.Key = sr.ReadToEnd();
+                    this.desKey = this.Key;
                 }
             }
         }

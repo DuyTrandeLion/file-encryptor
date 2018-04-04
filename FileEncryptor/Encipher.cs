@@ -31,6 +31,12 @@ namespace Encryptor
             privateKey = rsa.ToXmlString(true);
         }
 
+        public static void GenerateDESKey(out string key)
+        {
+            DESCryptoServiceProvider des = (DESCryptoServiceProvider) DES.Create();
+            key = ASCIIEncoding.ASCII.GetString(des.Key);
+        }
+
         /// <summary>
         /// Encrypt a file
         /// </summary>
@@ -66,10 +72,7 @@ namespace Encryptor
         /// <param name="plainFilePath">Full path of the file to be encrypted</param>
         /// <param name="encryptedFilePath">Full path of the encrypted file</param>
         /// <param name="manifestFilePath">Full path of the generated manifest file</param>
-        /// <param name="product">Product name</param>
-        /// <param name="productVersion">Product version</param>
         /// <param name="rsaKey">RSA key used to encrypt the one-time symmetrical key</param>
-        /// <param name="rsaKeyId">RSA key id for backend index</param>
         /// <returns>Encryption information including symmetrical keys for data encryption and signature, just for debug purpose</returns>
         public static string DESEncrypt(string plainFilePath,
             string encryptedFilePath,
@@ -77,10 +80,10 @@ namespace Encryptor
             string rsaKey)
         {
             byte[] signatureKey = GenerateRandom(64);
-            byte[] encryptionKey = GenerateRandom(16);
+            byte[] encryptionKey = GenerateRandom(64);
             byte[] encryptionIV = GenerateRandom(16);
 
-            DESEncryptFile(plainFilePath, encryptedFilePath, encryptionKey, encryptionIV);
+            //DESEncryptFile(plainFilePath, encryptedFilePath, encryptionKey, encryptionIV);
 
             byte[] signature = CalculateSignature(encryptedFilePath, signatureKey);
 
@@ -167,28 +170,31 @@ namespace Encryptor
         /// <param name="encryptedFilePath">Full path of the encrypted file</param>
         /// <param name="key">AES key</param>
         /// <param name="iv">AES IV</param>
-        private static void DESEncryptFile(string plainFilePath,
-            string encryptedFilePath,
-            byte[] key,
-            byte[] iv)
+        public static string DESEncryptFile(string source, string destination, string sKey)
         {
-            using (DESCryptoServiceProvider des = new DESCryptoServiceProvider())
-            {
-                des.KeySize = 128;
-                des.Key = key;
-                des.IV = iv;
-                ICryptoTransform encryptor = des.CreateEncryptor(des.Key, des.IV);
-                using (FileStream plain = File.Open(plainFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
-                {
-                    using (FileStream encrypted = File.Open(encryptedFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
-                    {
-                        using (CryptoStream cs = new CryptoStream(encrypted, encryptor, CryptoStreamMode.Write))
-                        {
-                            plain.CopyTo(cs);
-                        }
-                    }
-                }
-            }
+            FileStream fsInput = new FileStream(source,
+                FileMode.Open,
+                FileAccess.Read);
+
+            FileStream fsEncrypted = new FileStream(destination,
+                            FileMode.Create,
+                            FileAccess.Write);
+
+            DESCryptoServiceProvider DES = new DESCryptoServiceProvider();
+            DES.Key = ASCIIEncoding.ASCII.GetBytes(sKey);
+            DES.IV = ASCIIEncoding.ASCII.GetBytes(sKey);
+            ICryptoTransform desencrypt = DES.CreateEncryptor();
+            CryptoStream cryptostream = new CryptoStream(fsEncrypted,
+                                desencrypt,
+                                CryptoStreamMode.Write);
+            byte[] bytearrayinput = new byte[fsInput.Length - 1];
+            fsInput.Read(bytearrayinput, 0, bytearrayinput.Length);
+            cryptostream.Write(bytearrayinput, 0, bytearrayinput.Length);
+            cryptostream.Close();
+            fsInput.Close();
+            fsEncrypted.Close();
+            string res = "Success!";
+            return res;
         }
 
         /// <summary>
@@ -226,25 +232,31 @@ namespace Encryptor
         /// <param name="encryptedFilePath">Full path of the file to be decrypted</param>
         /// <param name="key">AES key</param>
         /// <param name="iv">AES IV</param>
-        public static void DESDecryptFile(string plainFilePath, string encryptedFilePath, byte[] key, byte[] iv)
+        public static void DESDecryptFile(string source, string destination, string sKey)
         {
-            using (DESCryptoServiceProvider des = new DESCryptoServiceProvider())
-            {
-                des.KeySize = 128;
-                des.Key = key;
-                des.IV = iv;
-                ICryptoTransform decryptor = des.CreateDecryptor(des.Key, des.IV);
-                using (FileStream plain = File.Open(plainFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
-                {
-                    using (FileStream encrypted = File.Open(encryptedFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
-                    {
-                        using (CryptoStream cs = new CryptoStream(plain, decryptor, CryptoStreamMode.Write))
-                        {
-                            encrypted.CopyTo(cs);
-                        }
-                    }
-                }
-            }
+            DESCryptoServiceProvider DES = new DESCryptoServiceProvider();
+            //A 64 bit key and IV is required for this provider.
+            //Set secret key For DES algorithm.
+            DES.Key = ASCIIEncoding.ASCII.GetBytes(sKey);
+            //Set initialization vector.
+            DES.IV = ASCIIEncoding.ASCII.GetBytes(sKey);
+
+            //Create a file stream to read the encrypted file back.
+            FileStream fsread = new FileStream(source,
+                                           FileMode.Open,
+                                           FileAccess.Read);
+            //Create a DES decryptor from the DES instance.
+            ICryptoTransform desdecrypt = DES.CreateDecryptor();
+            //Create crypto stream set to read and do a 
+            //DES decryption transform on incoming bytes.
+            CryptoStream cryptostreamDecr = new CryptoStream(fsread,
+                                                         desdecrypt,
+                                                         CryptoStreamMode.Read);
+            //Print the contents of the decrypted file.
+            StreamWriter fsDecrypted = new StreamWriter(destination);
+            fsDecrypted.Write(new StreamReader(cryptostreamDecr).ReadToEnd());
+            fsDecrypted.Flush();
+            fsDecrypted.Close();
         }
 
 

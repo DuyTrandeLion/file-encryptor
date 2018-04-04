@@ -34,6 +34,7 @@ namespace FileEncryptor
         private string product;
         private string productVersion;
         private string publicKeyID;
+        private string key;
 
         public string PublicKey
         {
@@ -99,6 +100,8 @@ namespace FileEncryptor
             }
         }
 
+        public string Key { get => key; set => key = value; }
+
         private void bt_OK_Click(object sender, RoutedEventArgs e)
         {
 
@@ -128,6 +131,7 @@ namespace FileEncryptor
                 using (StreamReader sr = File.OpenText(ofd.FileName))
                 {
                     this.PublicKey = sr.ReadToEnd();
+                    this.key = this.PublicKey;
                 }
             }
         }
